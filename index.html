@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>资金分配推演台</title>
+<style>
+  :root {
+    --bg: #0f1420; --panel: #171e2e; --panel2: #1d2638; --line: #2a3550;
+    --text: #e6ebf5; --muted: #8b96ad; --accent: #4f8cff;
+    --ok: #2fbf71; --partial: #e6a23c; --mutex: #b578e6; --bad: #e05c5c; --nopool: #7a8699;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.6 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+           padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0; }
+  .consistency { font-size: 12px; padding: 3px 10px; border-radius: 10px; }
+  .consistency.ok { background: rgba(47,191,113,.15); color: var(--ok); }
+  .consistency.bad { background: rgba(224,92,92,.15); color: var(--bad); }
+  .actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { background: var(--panel2); color: var(--text); border: 1px solid var(--line);
+         border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 13px; }
+  .btn:hover { border-color: var(--accent); }
+  .btn:disabled { opacity: .4; cursor: default; }
+  .btn.danger:hover { border-color: var(--bad); color: var(--bad); }
+  .btn.small { padding: 2px 8px; font-size: 12px; }
+  #cycleBanner { margin: 12px 20px 0; padding: 10px 14px; border-radius: 8px;
+                 background: rgba(224,92,92,.12); border: 1px solid var(--bad); color: #ffb4b4; }
+  main { display: grid; grid-template-columns: minmax(520px, 7fr) 5fr; gap: 16px; padding: 16px 20px 32px; }
+  @media (max-width: 1100px) { main { grid-template-columns: 1fr; } }
+  section h2 { font-size: 15px; margin: 18px 0 8px; color: var(--muted); }
+  section h2:first-child { margin-top: 0; }
+  .pool-card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+               padding: 10px 12px; margin-bottom: 8px; }
+  .pool-head { display: flex; align-items: center; gap: 8px; }
+  .pool-id { background: var(--panel2); border-radius: 4px; padding: 1px 8px; color: var(--accent); font-weight: 600; }
+  .pool-name { flex: 1; }
+  .pool-body { margin-top: 6px; color: var(--muted); font-size: 13px; }
+  .bar { height: 6px; background: var(--panel2); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+  .bar-fill { height: 100%; background: var(--accent); }
+  table { width: 100%; border-collapse: collapse; background: var(--panel);
+          border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  th, td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; font-size: 13px; }
+  th { color: var(--muted); font-weight: 500; background: var(--panel2); }
+  input, select { background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+                  border-radius: 5px; padding: 4px 6px; font-size: 13px; width: 100%; }
+  input[type=number] { width: 72px; }
+  td:nth-child(3) input, td:nth-child(5) input { width: 64px; }
+  .pid { color: var(--accent); font-weight: 600; }
+  #lastAction { color: var(--muted); font-size: 12px; margin-bottom: 8px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-left-width: 4px;
+          border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .card.ok { border-left-color: var(--ok); }
+  .card.partial { border-left-color: var(--partial); }
+  .card.mutex { border-left-color: var(--mutex); }
+  .card.cycle, .card.prereq { border-left-color: var(--bad); }
+  .card.nopool { border-left-color: var(--nopool); }
+  .card-head { display: flex; align-items: center; gap: 8px; }
+  .card-head .badge { margin-left: auto; }
+  .card-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .reasons { margin: 6px 0 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+  .badge { font-size: 12px; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+  .badge.ok { background: rgba(47,191,113,.15); color: var(--ok); }
+  .badge.partial { background: rgba(230,162,60,.15); color: var(--partial); }
+  .badge.mutex { background: rgba(181,120,230,.15); color: var(--mutex); }
+  .badge.cycle, .badge.prereq { background: rgba(224,92,92,.15); color: var(--bad); }
+  .badge.nopool { background: rgba(122,134,153,.2); color: var(--nopool); }
+  @keyframes flash { from { background: rgba(79,140,255,.25); } to { background: var(--panel); } }
+  .flash { animation: flash 1.2s ease-out; }
+  .conflict { background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+              padding: 10px 12px; margin-bottom: 8px; }
+  .conflict-title { font-weight: 600; margin-bottom: 6px; }
+  .conflict-side { font-size: 13px; color: var(--muted); padding: 3px 0; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>资金分配推演台</h1>
+  <span id="consistencyBadge" class="consistency ok"></span>
+  <div class="actions">
+    <button id="undoBtn" class="btn">撤销</button>
+    <button id="addProjectBtn" class="btn">新增项目</button>
+    <button id="addPoolBtn" class="btn">新增资金池</button>
+    <button id="exportBtn" class="btn">导出 JSON</button>
+    <button id="importBtn" class="btn" onclick="document.getElementById('importFile').click()">导入 JSON</button>
+    <input id="importFile" type="file" accept=".json,application/json" hidden>
+    <button id="resetBtn" class="btn">恢复示例</button>
+  </div>
+</header>
+<div id="cycleBanner" hidden></div>
+<main>
+  <section>
+    <h2>资金池</h2>
+    <div id="pools"></div>
+    <h2>项目条目（前置 / 互斥填项目编号，逗号分隔）</h2>
+    <table>
+      <thead><tr>
+        <th>编号</th><th>名称</th><th>投入需求</th><th>资金池</th><th>优先级</th><th>前置</th><th>互斥</th><th></th>
+      </tr></thead>
+      <tbody id="projectRows"></tbody>
+    </table>
+  </section>
+  <section>
+    <h2>分配结论</h2>
+    <div id="lastAction"></div>
+    <div id="conclusions"></div>
+    <h2>冲突明细（双方保留）</h2>
+    <div id="conflicts"></div>
+  </section>
+</main>
+<script src="engine.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
